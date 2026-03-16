@@ -8,16 +8,8 @@
 
 import { ContextStore } from '../store/index.js';
 import { sessionToContext } from './code-hook.js';
-import { execFileSync } from 'node:child_process';
+import { git } from '../utils/index.js';
 import { basename } from 'node:path';
-
-function git(...args: string[]): string {
-  try {
-    return execFileSync('git', args, { encoding: 'utf-8', timeout: 5000 }).trim();
-  } catch {
-    return '';
-  }
-}
 
 async function main() {
   const projectArg = process.argv[2];
@@ -39,7 +31,6 @@ async function main() {
   const store = new ContextStore();
   await store.init();
 
-  // Supersede previous session state for this project
   const existing = await store.list({ type: 'state', project });
   const latestState = existing
     .filter((ctx) => ctx.source_surface === 'code')

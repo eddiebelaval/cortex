@@ -1,10 +1,20 @@
-import { readFile, writeFile, readdir, mkdir, unlink, access } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdir, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import matter from 'gray-matter';
-import type { ContextObject, ContextFilter, SyncState, CortexConfig } from '../types/index.js';
+import type { ContextObject, ContextType, ContextFilter, SyncState, CortexConfig, Surface } from '../types/index.js';
 import { DEFAULT_CONFIG } from '../types/index.js';
+
+const VALID_TYPES = new Set<string>(['decision', 'artifact', 'state', 'priority', 'blocker', 'insight']);
+const VALID_SURFACES = new Set<string>(['chat', 'code', 'api', 'desktop']);
+const VALID_CONFIDENCE = new Set<string>(['high', 'medium', 'low']);
+const VALID_TTL = new Set<string>(['persistent', 'session', '24h', '7d']);
+
+const SURFACE_CONSUMES: Record<string, ContextType[]> = {
+  code: ['decision', 'priority', 'insight'],
+  chat: ['artifact', 'state', 'blocker'],
+};
 
 export class ContextStore {
   private storePath: string;
@@ -43,22 +53,16 @@ export class ContextStore {
       tags: context.tags,
     };
 
-    let content = `# ${context.title}\n\n${context.body}`;
     if (context.data && Object.keys(context.data).length > 0) {
-      content += `\n\n## Structured Data\n\n\`\`\`yaml\n`;
-      for (const [key, value] of Object.entries(context.data)) {
-        content += `${key}: ${JSON.stringify(value)}\n`;
-      }
-      content += '```\n';
+      frontmatter.structured_data = context.data;
     }
 
+    const content = `# ${context.title}\n\n${context.body}`;
     const fileContent = matter.stringify(content, frontmatter);
     const filePath = join(this.contextsPath, `${context.id}.md`);
     await writeFile(filePath, fileContent, 'utf-8');
 
     this.index.set(context.id, context);
-    await this.saveIndex();
-
     return context.id;
   }
 
@@ -66,15 +70,7 @@ export class ContextStore {
     if (this.index.has(id)) {
       return this.index.get(id)!;
     }
-
-    const filePath = join(this.contextsPath, `${id}.md`);
-    try {
-      await access(filePath);
-    } catch {
-      return null;
-    }
-
-    return this.parseContextFile(filePath);
+    return this.parseContextFile(join(this.contextsPath, `${id}.md`));
   }
 
   async list(filter?: ContextFilter): Promise<ContextObject[]> {
@@ -115,7 +111,6 @@ export class ContextStore {
     try {
       await unlink(filePath);
       this.index.delete(id);
-      await this.saveIndex();
       return true;
     } catch {
       return false;
@@ -131,23 +126,14 @@ export class ContextStore {
 
   async getForSurface(project: string, targetSurface: string): Promise<ContextObject[]> {
     const all = await this.getForProject(project);
+    const allowedTypes = SURFACE_CONSUMES[targetSurface];
 
-    // Filter to contexts that the target surface should consume
-    // Code consumes: decisions, priorities, insights from Chat
-    // Chat consumes: artifacts, state, blockers from Code
-    if (targetSurface === 'code') {
-      return all.filter((ctx) =>
-        ctx.source_surface !== 'code' &&
-        ['decision', 'priority', 'insight'].includes(ctx.type)
-      );
-    }
-    if (targetSurface === 'chat') {
-      return all.filter((ctx) =>
-        ctx.source_surface !== 'chat' &&
-        ['artifact', 'state', 'blocker'].includes(ctx.type)
-      );
-    }
-    return all;
+    if (!allowedTypes) return all;
+
+    return all.filter((ctx) =>
+      ctx.source_surface !== targetSurface &&
+      allowedTypes.includes(ctx.type)
+    );
   }
 
   async getSyncState(surface: string): Promise<SyncState | null> {
@@ -166,14 +152,16 @@ export class ContextStore {
   }
 
   async compact(): Promise<number> {
-    let removed = 0;
-    for (const [id, ctx] of this.index) {
-      if (this.isExpired(ctx)) {
-        await this.delete(id);
-        removed++;
-      }
+    const expired = [...this.index.entries()]
+      .filter(([, ctx]) => this.isExpired(ctx))
+      .map(([id]) => id);
+
+    for (const id of expired) {
+      await unlink(join(this.contextsPath, `${id}.md`)).catch(() => {});
+      this.index.delete(id);
     }
-    return removed;
+
+    return expired.length;
   }
 
   async export(): Promise<ContextObject[]> {
@@ -196,25 +184,16 @@ export class ContextStore {
       return;
     }
 
-    for (const file of files) {
-      if (!file.endsWith('.md')) continue;
-      const ctx = await this.parseContextFile(join(this.contextsPath, file));
+    const mdFiles = files.filter((f) => f.endsWith('.md'));
+    const results = await Promise.all(
+      mdFiles.map((f) => this.parseContextFile(join(this.contextsPath, f)))
+    );
+
+    for (const ctx of results) {
       if (ctx) {
         this.index.set(ctx.id, ctx);
       }
     }
-  }
-
-  private async saveIndex(): Promise<void> {
-    const indexPath = join(this.storePath, 'index.json');
-    const entries = Array.from(this.index.values()).map((ctx) => ({
-      id: ctx.id,
-      type: ctx.type,
-      project: ctx.project,
-      timestamp: ctx.timestamp,
-      title: ctx.title,
-    }));
-    await writeFile(indexPath, JSON.stringify(entries, null, 2), 'utf-8');
   }
 
   private async parseContextFile(filePath: string): Promise<ContextObject | null> {
@@ -223,8 +202,11 @@ export class ContextStore {
       const parsed = matter(raw);
       const data = parsed.data as Record<string, unknown>;
 
+      if (!data.id || !VALID_TYPES.has(data.type as string)) return null;
+      if (!VALID_SURFACES.has(data.source_surface as string)) return null;
+
       const title = parsed.content.match(/^# (.+)$/m)?.[1] ?? 'Untitled';
-      const bodyMatch = parsed.content.match(/^# .+\n\n([\s\S]*?)(?:\n## Structured Data|$)/);
+      const bodyMatch = parsed.content.match(/^# .+\n\n([\s\S]*?)$/);
       const body = bodyMatch?.[1]?.trim() ?? parsed.content.trim();
 
       return {
@@ -233,8 +215,12 @@ export class ContextStore {
         source_surface: data.source_surface as ContextObject['source_surface'],
         timestamp: data.timestamp as string,
         project: (data.project as string) ?? null,
-        confidence: data.confidence as ContextObject['confidence'],
-        ttl: data.ttl as ContextObject['ttl'],
+        confidence: VALID_CONFIDENCE.has(data.confidence as string)
+          ? (data.confidence as ContextObject['confidence'])
+          : 'medium',
+        ttl: VALID_TTL.has(data.ttl as string)
+          ? (data.ttl as ContextObject['ttl'])
+          : 'persistent',
         supersedes: (data.supersedes as string) ?? null,
         tags: (data.tags as string[]) ?? [],
         title,
@@ -258,7 +244,7 @@ export class ContextStore {
       case '7d':
         return now - created > 7 * 24 * 60 * 60 * 1000;
       case 'session':
-        return false; // Session TTL is managed by the surface, not the store
+        return false;
       default:
         return false;
     }

@@ -15,6 +15,7 @@
  */
 
 import { ContextStore } from '../store/index.js';
+import { formatContextSummary } from '../utils/index.js';
 
 async function main() {
   const project = process.argv[2];
@@ -31,7 +32,6 @@ async function main() {
   const contexts = await store.getForSurface(project, surface);
 
   if (contexts.length === 0) {
-    // No context — output nothing (clean injection)
     process.exit(0);
   }
 
@@ -40,46 +40,7 @@ async function main() {
   console.log(`> ${contexts.length} context(s) synced from other surfaces.`);
   console.log(`> Last updated: ${new Date().toISOString()}`);
   console.log();
-
-  // Group by type
-  const grouped = new Map<string, typeof contexts>();
-  for (const ctx of contexts) {
-    const group = grouped.get(ctx.type) ?? [];
-    group.push(ctx);
-    grouped.set(ctx.type, group);
-  }
-
-  // Priority order: decisions first, then priorities, then insights, then rest
-  const typeOrder = ['decision', 'priority', 'insight', 'artifact', 'state', 'blocker'];
-
-  for (const type of typeOrder) {
-    const items = grouped.get(type);
-    if (!items || items.length === 0) continue;
-
-    const label = type.charAt(0).toUpperCase() + type.slice(1) + 's';
-    console.log(`## ${label}`);
-    console.log();
-
-    for (const ctx of items) {
-      const age = formatAge(ctx.timestamp);
-      const conf = ctx.confidence === 'high' ? '' : ` [${ctx.confidence}]`;
-      console.log(`### ${ctx.title}${conf}`);
-      console.log(`*${age} ago via ${ctx.source_surface}*`);
-      console.log();
-      console.log(ctx.body);
-      console.log();
-    }
-  }
-}
-
-function formatAge(timestamp: string): string {
-  const ms = Date.now() - new Date(timestamp).getTime();
-  const mins = Math.floor(ms / (1000 * 60));
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
+  console.log(formatContextSummary(contexts));
 }
 
 main();

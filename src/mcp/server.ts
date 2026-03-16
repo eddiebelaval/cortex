@@ -24,6 +24,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { ContextStore } from '../store/index.js';
+import { formatAge, summarizeContexts, formatStoreSummary, formatContextSummary } from '../utils/index.js';
 import type { ContextType, Surface, Confidence, TTL } from '../types/index.js';
 
 const store = new ContextStore();
@@ -183,13 +184,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  await store.init();
-
   const { name, arguments: args } = request.params;
+  const a = (args ?? {}) as Record<string, unknown>;
 
   switch (name) {
     case 'cortex_query': {
-      const a = args as Record<string, unknown>;
       const contexts = await store.list({
         type: a.type as ContextType | undefined,
         project: a.project as string | undefined,
@@ -214,7 +213,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_write': {
-      const a = args as Record<string, unknown>;
       const context = {
         id: store.generateId(),
         type: a.type as ContextType,
@@ -237,38 +235,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     case 'cortex_status': {
       const all = await store.export();
-      const byType = new Map<string, number>();
-      const byProject = new Map<string, number>();
-      const bySurface = new Map<string, number>();
-
-      for (const ctx of all) {
-        byType.set(ctx.type, (byType.get(ctx.type) ?? 0) + 1);
-        const proj = ctx.project ?? '(global)';
-        byProject.set(proj, (byProject.get(proj) ?? 0) + 1);
-        bySurface.set(ctx.source_surface, (bySurface.get(ctx.source_surface) ?? 0) + 1);
-      }
-
-      let text = `Cortex Store: ${all.length} context object(s)\n\n`;
-      if (byType.size > 0) {
-        text += 'By type:\n';
-        for (const [t, c] of byType) text += `  ${t}: ${c}\n`;
-        text += '\n';
-      }
-      if (byProject.size > 0) {
-        text += 'By project:\n';
-        for (const [p, c] of byProject) text += `  ${p}: ${c}\n`;
-        text += '\n';
-      }
-      if (bySurface.size > 0) {
-        text += 'By surface:\n';
-        for (const [s, c] of bySurface) text += `  ${s}: ${c}\n`;
-      }
-
-      return { content: [{ type: 'text', text }] };
+      const summary = summarizeContexts(all);
+      return { content: [{ type: 'text', text: formatStoreSummary(summary) }] };
     }
 
     case 'cortex_show': {
-      const a = args as Record<string, unknown>;
       const ctx = await store.read(a.id as string);
       if (!ctx) {
         return { content: [{ type: 'text', text: `Context ${a.id} not found.` }] };
@@ -296,7 +267,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_delete': {
-      const a = args as Record<string, unknown>;
       const success = await store.delete(a.id as string);
       return {
         content: [
@@ -309,7 +279,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_inject': {
-      const a = args as Record<string, unknown>;
       const project = a.project as string;
       const surface = (a.surface as string) ?? 'code';
       const contexts = await store.getForSurface(project, surface);
@@ -322,25 +291,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       let text = `# Cortex — Cross-Surface Context for ${project}\n\n`;
       text += `${contexts.length} context(s) from other surfaces.\n\n`;
-
-      const typeOrder = ['decision', 'priority', 'insight', 'artifact', 'state', 'blocker'];
-      const grouped = new Map<string, typeof contexts>();
-      for (const ctx of contexts) {
-        const group = grouped.get(ctx.type) ?? [];
-        group.push(ctx);
-        grouped.set(ctx.type, group);
-      }
-
-      for (const type of typeOrder) {
-        const items = grouped.get(type);
-        if (!items || items.length === 0) continue;
-        const label = type.charAt(0).toUpperCase() + type.slice(1) + 's';
-        text += `## ${label}\n\n`;
-        for (const ctx of items) {
-          const age = formatAge(ctx.timestamp);
-          text += `### ${ctx.title}\n*${age} ago via ${ctx.source_surface}*\n\n${ctx.body}\n\n`;
-        }
-      }
+      text += formatContextSummary(contexts);
 
       return { content: [{ type: 'text', text }] };
     }
@@ -350,17 +301,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-function formatAge(timestamp: string): string {
-  const ms = Date.now() - new Date(timestamp).getTime();
-  const mins = Math.floor(ms / (1000 * 60));
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
-
 async function main() {
+  await store.init();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

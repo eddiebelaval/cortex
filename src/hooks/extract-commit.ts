@@ -10,16 +10,8 @@
 
 import { ContextStore } from '../store/index.js';
 import { commitToContext } from './code-hook.js';
-import { execFileSync } from 'node:child_process';
+import { git } from '../utils/index.js';
 import { basename } from 'node:path';
-
-function git(...args: string[]): string {
-  try {
-    return execFileSync('git', args, { encoding: 'utf-8', timeout: 5000 }).trim();
-  } catch {
-    return '';
-  }
-}
 
 async function main() {
   let input = '';
