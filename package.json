@@ -1,0 +1,45 @@
+{
+  "name": "cortex-protocol",
+  "version": "0.1.0",
+  "description": "The continuity protocol for Claude surfaces",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cortex": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "continuity",
+    "context",
+    "mcp",
+    "anthropic"
+  ],
+  "author": "Eddie Belaval <eddie@id8labs.app>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eddiebelaval/cortex.git"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "commander": "^13.0.0",
+    "yaml": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
