@@ -329,7 +329,7 @@ describe('Hook E2E', () => {
 
     const md = formatContextSummary(contexts);
     expect(md).toContain('## Decisions');
-    expect(md).toContain('## Prioritys'); // current formatting behavior
+    expect(md).toContain('## Priorities');
     expect(md).toContain('Use email OTP');
     expect(md).toContain('Ship auth first');
     expect(md).toContain('via chat');

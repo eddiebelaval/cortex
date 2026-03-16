@@ -9,12 +9,18 @@
     "cortex": "dist/cli/index.js",
     "cortex-mcp": "dist/mcp/server.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest",
+    "test": "vitest run",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "claude",
@@ -38,7 +44,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "commander": "^13.0.0",
-    "gray-matter": "^4.0.3"
+    "gray-matter": "^4.0.3",
+    "zod": "^4.3.6"
   },
   "engines": {
     "node": ">=20.0.0"

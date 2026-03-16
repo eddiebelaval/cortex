@@ -60,6 +60,11 @@ export class ContextStore {
     await writeFile(filePath, fileContent, 'utf-8');
 
     this.index.set(context.id, context);
+
+    if (context.supersedes) {
+      await this.delete(context.supersedes);
+    }
+
     return context.id;
   }
 
@@ -161,6 +166,10 @@ export class ContextStore {
 
   get size(): number {
     return this.index.size;
+  }
+
+  get watchPath(): string {
+    return this.contextsPath;
   }
 
   // --- Private ---

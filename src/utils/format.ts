@@ -14,6 +14,15 @@ import type { ContextType } from '../types/index.js';
 
 const TYPE_ORDER: ContextType[] = ['decision', 'priority', 'insight', 'artifact', 'state', 'blocker'];
 
+const TYPE_LABELS: Record<string, string> = {
+  decision: 'Decisions',
+  priority: 'Priorities',
+  insight: 'Insights',
+  artifact: 'Artifacts',
+  state: 'States',
+  blocker: 'Blockers',
+};
+
 export interface StoreSummary {
   byType: Map<string, number>;
   byProject: Map<string, number>;
@@ -69,7 +78,7 @@ export function formatContextSummary(contexts: ContextObject[]): string {
   for (const type of TYPE_ORDER) {
     const items = grouped.get(type);
     if (!items || items.length === 0) continue;
-    const label = type.charAt(0).toUpperCase() + type.slice(1) + 's';
+    const label = TYPE_LABELS[type] ?? type;
     text += `## ${label}\n\n`;
     for (const ctx of items) {
       const age = formatAge(ctx.timestamp);

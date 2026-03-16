@@ -17,6 +17,7 @@
  *   cortex_inject  — Get cross-surface context for a project
  */
 
+import { watch } from 'node:fs';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -25,9 +26,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { ContextStore } from '../store/index.js';
 import { formatAge, summarizeContexts, formatStoreSummary, formatContextSummary } from '../utils/index.js';
-import type { ContextType, Surface, Confidence, TTL } from '../types/index.js';
+import { querySchema, writeSchema, idSchema, injectSchema } from './schemas.js';
+import type { Surface } from '../types/index.js';
 
 const store = new ContextStore();
+let storeDirty = false;
 
 const server = new Server(
   {
@@ -189,17 +192,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-  const params = (args ?? {}) as Record<string, unknown>;
+  if (storeDirty) {
+    await store.init();
+    storeDirty = false;
+  }
 
-  switch (name) {
+  const { name, arguments: args } = request.params;
+  const raw = args ?? {};
+
+  try { switch (name) {
     case 'cortex_query': {
+      const params = querySchema.parse(raw);
       const contexts = await store.list({
-        type: params.type as ContextType | undefined,
-        project: params.project as string | undefined,
-        surface: params.surface as Surface | undefined,
-        since: params.since as string | undefined,
-        tags: params.tags as string[] | undefined,
+        type: params.type,
+        project: params.project,
+        surface: params.surface,
+        since: params.since,
+        tags: params.tags,
         excludeExpired: true,
       });
 
@@ -218,18 +227,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_write': {
+      const params = writeSchema.parse(raw);
       const context = {
         id: store.generateId(),
-        type: params.type as ContextType,
-        source_surface: (params.source_surface as Surface) ?? 'code',
+        type: params.type,
+        source_surface: params.source_surface as Surface,
         timestamp: new Date().toISOString(),
-        project: (params.project as string) ?? null,
-        confidence: (params.confidence as Confidence) ?? 'high',
-        ttl: (params.ttl as TTL) ?? 'persistent',
-        supersedes: (params.supersedes as string) ?? null,
-        tags: (params.tags as string[]) ?? [],
-        title: params.title as string,
-        body: params.body as string,
+        project: params.project ?? null,
+        confidence: params.confidence,
+        ttl: params.ttl,
+        supersedes: params.supersedes ?? null,
+        tags: params.tags,
+        title: params.title,
+        body: params.body,
       };
 
       const id = await store.write(context);
@@ -245,7 +255,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_show': {
-      const ctx = await store.read(params.id as string);
+      const params = idSchema.parse(raw);
+      const ctx = await store.read(params.id);
       if (!ctx) {
         return { content: [{ type: 'text', text: `Context ${params.id} not found.` }] };
       }
@@ -272,7 +283,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_delete': {
-      const success = await store.delete(params.id as string);
+      const params = idSchema.parse(raw);
+      const success = await store.delete(params.id);
       return {
         content: [
           {
@@ -284,17 +296,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_inject': {
-      const project = params.project as string;
-      const surface = (params.surface as string) ?? 'code';
-      const contexts = await store.getForSurface(project, surface);
+      const params = injectSchema.parse(raw);
+      const contexts = await store.getForSurface(params.project, params.surface);
 
       if (contexts.length === 0) {
         return {
-          content: [{ type: 'text', text: `No cross-surface context for ${project}.` }],
+          content: [{ type: 'text', text: `No cross-surface context for ${params.project}.` }],
         };
       }
 
-      let text = `# Cortex — Cross-Surface Context for ${project}\n\n`;
+      let text = `# Cortex — Cross-Surface Context for ${params.project}\n\n`;
       text += `${contexts.length} context(s) from other surfaces.\n\n`;
       text += formatContextSummary(contexts);
 
@@ -304,10 +315,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     default:
       return { content: [{ type: 'text', text: `Unknown tool: ${name}` }] };
   }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { content: [{ type: 'text', text: `Validation error: ${message}` }] };
+  }
 });
 
 async function main() {
   await store.init();
+
+  // Watch for external writes (hooks writing contexts while MCP is running)
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    watch(store.watchPath, () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { storeDirty = true; }, 500);
+    });
+  } catch {
+    // If watch fails, fall back to dirty flag on every write
+    storeDirty = true;
+  }
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
