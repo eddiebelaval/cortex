@@ -7,3 +7,8 @@ export function git(...args: string[]): string {
     return '';
   }
 }
+
+export function gitLines(...args: string[]): string[] {
+  const output = git(...args);
+  return output ? output.split('\n') : [];
+}

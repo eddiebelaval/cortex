@@ -1,17 +1,5 @@
-/**
- * Claude Code Hook — Cortex Context Extraction
- *
- * This module provides the logic for a Claude Code PostToolUse hook
- * that automatically extracts context from coding sessions and writes
- * it to the Cortex store.
- *
- * Install as a Claude Code hook:
- *   PostToolUse (Bash — git commit): cortex hook commit
- *   PreToolUse (session start): cortex hook inject <project>
- */
-
 import { ContextStore } from '../store/index.js';
-import type { ContextObject, ContextType, Confidence } from '../types/index.js';
+import type { ContextObject } from '../types/index.js';
 
 export interface CommitInfo {
   hash: string;
@@ -30,26 +18,20 @@ export interface SessionState {
 }
 
 export function commitToContext(commit: CommitInfo, store: ContextStore): ContextObject {
-  const isFeature = commit.message.startsWith('feat');
-  const isFix = commit.message.startsWith('fix');
-
-  const type: ContextType = 'artifact';
-  const confidence: Confidence = 'high';
+  const tags = [commit.branch];
+  if (commit.message.startsWith('feat')) tags.push('feature');
+  if (commit.message.startsWith('fix')) tags.push('bugfix');
 
   return {
     id: store.generateId(),
-    type,
+    type: 'artifact',
     source_surface: 'code',
     timestamp: new Date().toISOString(),
     project: commit.project,
-    confidence,
+    confidence: 'high',
     ttl: 'persistent',
     supersedes: null,
-    tags: [
-      commit.branch,
-      ...(isFeature ? ['feature'] : []),
-      ...(isFix ? ['bugfix'] : []),
-    ],
+    tags,
     title: commit.message.split('\n')[0],
     body: [
       `Commit \`${commit.hash}\` on branch \`${commit.branch}\`.`,

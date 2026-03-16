@@ -10,7 +10,7 @@
 
 import { ContextStore } from '../store/index.js';
 import { commitToContext } from './code-hook.js';
-import { git } from '../utils/index.js';
+import { git, gitLines } from '../utils/index.js';
 import { basename } from 'node:path';
 
 async function main() {
@@ -35,12 +35,11 @@ async function main() {
     const hash = git('rev-parse', '--short', 'HEAD');
     const message = git('log', '-1', '--pretty=%B');
     const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
-    const filesRaw = git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD');
-    const filesChanged = filesRaw ? filesRaw.split('\n') : [];
+    const filesChanged = gitLines('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD');
     const projectDir = git('rev-parse', '--show-toplevel');
     const project = basename(projectDir);
 
-    if (!hash || !message) process.exit(0);
+    if (!hash || !message || !branch) process.exit(0);
 
     const store = new ContextStore();
     await store.init();

@@ -8,7 +8,7 @@
 
 import { ContextStore } from '../store/index.js';
 import { sessionToContext } from './code-hook.js';
-import { git } from '../utils/index.js';
+import { git, gitLines } from '../utils/index.js';
 import { basename } from 'node:path';
 
 async function main() {
@@ -21,11 +21,11 @@ async function main() {
 
   const project = projectArg ?? basename(projectDir);
   const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
-  const modifiedRaw = git('diff', '--name-only');
-  const stagedRaw = git('diff', '--cached', '--name-only');
+  if (!branch) process.exit(0);
+
   const activeFiles = [...new Set([
-    ...(modifiedRaw ? modifiedRaw.split('\n') : []),
-    ...(stagedRaw ? stagedRaw.split('\n') : []),
+    ...gitLines('diff', '--name-only'),
+    ...gitLines('diff', '--cached', '--name-only'),
   ])];
 
   const store = new ContextStore();

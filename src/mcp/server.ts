@@ -119,6 +119,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             description: 'ID of a context object this replaces',
           },
+          source_surface: {
+            type: 'string',
+            enum: ['chat', 'code', 'api', 'desktop'],
+            description: 'Which surface is producing this context (default: code)',
+          },
         },
         required: ['type', 'title', 'body'],
       },
@@ -185,16 +190,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  const a = (args ?? {}) as Record<string, unknown>;
+  const params = (args ?? {}) as Record<string, unknown>;
 
   switch (name) {
     case 'cortex_query': {
       const contexts = await store.list({
-        type: a.type as ContextType | undefined,
-        project: a.project as string | undefined,
-        surface: a.surface as Surface | undefined,
-        since: a.since as string | undefined,
-        tags: a.tags as string[] | undefined,
+        type: params.type as ContextType | undefined,
+        project: params.project as string | undefined,
+        surface: params.surface as Surface | undefined,
+        since: params.since as string | undefined,
+        tags: params.tags as string[] | undefined,
         excludeExpired: true,
       });
 
@@ -215,16 +220,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     case 'cortex_write': {
       const context = {
         id: store.generateId(),
-        type: a.type as ContextType,
-        source_surface: 'code' as Surface,
+        type: params.type as ContextType,
+        source_surface: (params.source_surface as Surface) ?? 'code',
         timestamp: new Date().toISOString(),
-        project: (a.project as string) ?? null,
-        confidence: (a.confidence as Confidence) ?? 'high',
-        ttl: (a.ttl as TTL) ?? 'persistent',
-        supersedes: (a.supersedes as string) ?? null,
-        tags: (a.tags as string[]) ?? [],
-        title: a.title as string,
-        body: a.body as string,
+        project: (params.project as string) ?? null,
+        confidence: (params.confidence as Confidence) ?? 'high',
+        ttl: (params.ttl as TTL) ?? 'persistent',
+        supersedes: (params.supersedes as string) ?? null,
+        tags: (params.tags as string[]) ?? [],
+        title: params.title as string,
+        body: params.body as string,
       };
 
       const id = await store.write(context);
@@ -240,9 +245,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_show': {
-      const ctx = await store.read(a.id as string);
+      const ctx = await store.read(params.id as string);
       if (!ctx) {
-        return { content: [{ type: 'text', text: `Context ${a.id} not found.` }] };
+        return { content: [{ type: 'text', text: `Context ${params.id} not found.` }] };
       }
 
       const text = [
@@ -267,20 +272,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     case 'cortex_delete': {
-      const success = await store.delete(a.id as string);
+      const success = await store.delete(params.id as string);
       return {
         content: [
           {
             type: 'text',
-            text: success ? `Deleted ${a.id}` : `Context ${a.id} not found.`,
+            text: success ? `Deleted ${params.id}` : `Context ${params.id} not found.`,
           },
         ],
       };
     }
 
     case 'cortex_inject': {
-      const project = a.project as string;
-      const surface = (a.surface as string) ?? 'code';
+      const project = params.project as string;
+      const surface = (params.surface as string) ?? 'code';
       const contexts = await store.getForSurface(project, surface);
 
       if (contexts.length === 0) {

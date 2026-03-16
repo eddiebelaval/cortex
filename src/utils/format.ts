@@ -10,7 +10,9 @@ export function formatAge(timestamp: string): string {
   return `${days}d`;
 }
 
-const TYPE_ORDER = ['decision', 'priority', 'insight', 'artifact', 'state', 'blocker'] as const;
+import type { ContextType } from '../types/index.js';
+
+const TYPE_ORDER: ContextType[] = ['decision', 'priority', 'insight', 'artifact', 'state', 'blocker'];
 
 export interface StoreSummary {
   byType: Map<string, number>;

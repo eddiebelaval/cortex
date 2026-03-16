@@ -25,7 +25,7 @@ export class ContextStore {
 
   constructor(config?: Partial<CortexConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.storePath = resolve(this.config.storePath.replace('~', homedir()));
+    this.storePath = resolve(this.config.storePath.replace(/^~/, homedir()));
     this.contextsPath = join(this.storePath, 'contexts');
     this.surfacesPath = join(this.storePath, 'surfaces');
   }
@@ -36,29 +36,26 @@ export class ContextStore {
     await this.loadIndex();
   }
 
+  private static readonly ID_PATTERN = /^ctx_[a-f0-9]{8}$/;
+
+  static isValidId(id: string): boolean {
+    return ContextStore.ID_PATTERN.test(id);
+  }
+
   generateId(): string {
     return `ctx_${randomUUID().slice(0, 8)}`;
   }
 
   async write(context: ContextObject): Promise<string> {
-    const frontmatter: Record<string, unknown> = {
-      id: context.id,
-      type: context.type,
-      source_surface: context.source_surface,
-      timestamp: context.timestamp,
-      project: context.project,
-      confidence: context.confidence,
-      ttl: context.ttl,
-      supersedes: context.supersedes,
-      tags: context.tags,
-    };
+    const { title, body, data, ...frontmatter } = context;
 
-    if (context.data && Object.keys(context.data).length > 0) {
-      frontmatter.structured_data = context.data;
+    const metadata: Record<string, unknown> = { ...frontmatter };
+    if (data && Object.keys(data).length > 0) {
+      metadata.structured_data = data;
     }
 
-    const content = `# ${context.title}\n\n${context.body}`;
-    const fileContent = matter.stringify(content, frontmatter);
+    const content = `# ${title}\n\n${body}`;
+    const fileContent = matter.stringify(content, metadata);
     const filePath = join(this.contextsPath, `${context.id}.md`);
     await writeFile(filePath, fileContent, 'utf-8');
 
@@ -70,6 +67,7 @@ export class ContextStore {
     if (this.index.has(id)) {
       return this.index.get(id)!;
     }
+    if (!ContextStore.isValidId(id)) return null;
     return this.parseContextFile(join(this.contextsPath, `${id}.md`));
   }
 
@@ -82,31 +80,24 @@ export class ContextStore {
         const types = Array.isArray(filter.type) ? filter.type : [filter.type];
         if (!types.includes(ctx.type)) return false;
       }
-      if (filter.project !== undefined) {
-        if (ctx.project !== filter.project) return false;
-      }
+      if (filter.project !== undefined && ctx.project !== filter.project) return false;
       if (filter.surface) {
         const surfaces = Array.isArray(filter.surface) ? filter.surface : [filter.surface];
         if (!surfaces.includes(ctx.source_surface)) return false;
       }
-      if (filter.tags && filter.tags.length > 0) {
-        if (!filter.tags.some((tag) => ctx.tags.includes(tag))) return false;
-      }
-      if (filter.since) {
-        if (new Date(ctx.timestamp) < new Date(filter.since)) return false;
-      }
+      if (filter.tags?.length && !filter.tags.some((tag) => ctx.tags.includes(tag))) return false;
+      if (filter.since && new Date(ctx.timestamp) < new Date(filter.since)) return false;
       if (filter.confidence) {
         const confidences = Array.isArray(filter.confidence) ? filter.confidence : [filter.confidence];
         if (!confidences.includes(ctx.confidence)) return false;
       }
-      if (filter.excludeExpired) {
-        if (this.isExpired(ctx)) return false;
-      }
+      if (filter.excludeExpired && this.isExpired(ctx)) return false;
       return true;
     });
   }
 
   async delete(id: string): Promise<boolean> {
+    if (!this.index.has(id) && !ContextStore.isValidId(id)) return false;
     const filePath = join(this.contextsPath, `${id}.md`);
     try {
       await unlink(filePath);
@@ -244,7 +235,7 @@ export class ContextStore {
       case '7d':
         return now - created > 7 * 24 * 60 * 60 * 1000;
       case 'session':
-        return false;
+        return now - created > 8 * 60 * 60 * 1000; // 8h
       default:
         return false;
     }
