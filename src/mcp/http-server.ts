@@ -277,8 +277,9 @@ async function main() {
 
         const mcpServer = createMcpServer();
         await mcpServer.connect(transport);
+        await transport.handleRequest(req, res);
 
-        // Track the session
+        // Track the session after handleRequest (session ID is set during handling)
         const sid = transport.sessionId;
         if (sid) {
           transports.set(sid, transport);
@@ -286,8 +287,6 @@ async function main() {
             transports.delete(sid);
           };
         }
-
-        await transport.handleRequest(req, res);
         return;
       }
 
