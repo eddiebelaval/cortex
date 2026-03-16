@@ -259,18 +259,17 @@ async function main() {
     }
 
     // MCP endpoint
-    if (req.url === '/mcp') {
-      // Check for existing session
+    if (req.url === '/mcp' || req.url?.startsWith('/mcp?')) {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
+      // Existing session — forward all methods (POST, GET for SSE, DELETE for close)
       if (sessionId && transports.has(sessionId)) {
-        const transport = transports.get(sessionId)!;
-        await transport.handleRequest(req, res);
+        await transports.get(sessionId)!.handleRequest(req, res);
         return;
       }
 
+      // New session (POST without session ID)
       if (req.method === 'POST' && !sessionId) {
-        // New session — create transport + server
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
         });
@@ -279,23 +278,25 @@ async function main() {
         await mcpServer.connect(transport);
         await transport.handleRequest(req, res);
 
-        // Track the session after handleRequest (session ID is set during handling)
         const sid = transport.sessionId;
         if (sid) {
           transports.set(sid, transport);
-          transport.onclose = () => {
-            transports.delete(sid);
-          };
+          transport.onclose = () => transports.delete(sid);
         }
         return;
       }
 
-      // Session not found
-      if (sessionId && !transports.has(sessionId)) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Session not found' }));
+      // GET without session — could be SSE probe, return method not allowed
+      if (req.method === 'GET' && !sessionId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing Mcp-Session-Id header. Initialize first with POST.' }));
         return;
       }
+
+      // Session not found
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Session not found. Send initialize first.' }));
+      return;
     }
 
     // 404 for everything else
