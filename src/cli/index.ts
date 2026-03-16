@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { ContextStore } from '../store/index.js';
 import { formatAge, summarizeContexts, formatStoreSummary, formatContextSummary } from '../utils/index.js';
+import type { ContextType, Surface, Confidence, TTL } from '../types/index.js';
 
 const store = new ContextStore();
 
@@ -108,6 +109,62 @@ program
     await store.init();
     const all = await store.export();
     console.log(JSON.stringify(all, null, 2));
+  });
+
+program
+  .command('write')
+  .description('Create a new context object')
+  .requiredOption('-t, --type <type>', 'Context type: decision | artifact | state | priority | blocker | insight')
+  .requiredOption('--title <title>', 'Short title')
+  .requiredOption('--body <body>', 'Description / body content')
+  .option('-p, --project <project>', 'Project name (default: global)')
+  .option('-s, --source <surface>', 'Source surface', 'chat')
+  .option('--confidence <level>', 'Confidence: high | medium | low', 'high')
+  .option('--ttl <ttl>', 'TTL: persistent | session | 24h | 7d', 'persistent')
+  .option('--tags <tags>', 'Comma-separated tags')
+  .option('--supersedes <id>', 'ID of context to replace')
+  .action(async (opts) => {
+    const validTypes: ContextType[] = ['decision', 'artifact', 'state', 'priority', 'blocker', 'insight'];
+    const validSurfaces: Surface[] = ['chat', 'code', 'api', 'desktop'];
+    const validConfidence: Confidence[] = ['high', 'medium', 'low'];
+    const validTTLs: TTL[] = ['persistent', 'session', '24h', '7d'];
+
+    if (!validTypes.includes(opts.type as ContextType)) {
+      console.error(`Invalid type "${opts.type}". Must be one of: ${validTypes.join(', ')}`);
+      process.exit(1);
+    }
+    if (!validSurfaces.includes(opts.source as Surface)) {
+      console.error(`Invalid source "${opts.source}". Must be one of: ${validSurfaces.join(', ')}`);
+      process.exit(1);
+    }
+    if (!validConfidence.includes(opts.confidence as Confidence)) {
+      console.error(`Invalid confidence "${opts.confidence}". Must be one of: ${validConfidence.join(', ')}`);
+      process.exit(1);
+    }
+    if (!validTTLs.includes(opts.ttl as TTL)) {
+      console.error(`Invalid ttl "${opts.ttl}". Must be one of: ${validTTLs.join(', ')}`);
+      process.exit(1);
+    }
+
+    await store.init();
+
+    const id = store.generateId();
+    const context = {
+      id,
+      type: opts.type as ContextType,
+      source_surface: opts.source as Surface,
+      timestamp: new Date().toISOString(),
+      project: opts.project ?? null,
+      confidence: opts.confidence as Confidence,
+      ttl: opts.ttl as TTL,
+      supersedes: opts.supersedes ?? null,
+      tags: opts.tags ? (opts.tags as string).split(',').map((t: string) => t.trim()) : [],
+      title: opts.title as string,
+      body: opts.body as string,
+    };
+
+    await store.write(context);
+    console.log(`${id}  ${context.title}`);
   });
 
 program

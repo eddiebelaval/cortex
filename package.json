@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "bin": {
     "cortex": "dist/cli/index.js",
-    "cortex-mcp": "dist/mcp/server.js"
+    "cortex-mcp": "dist/mcp/server.js",
+    "cortex-serve": "dist/mcp/http-server.js"
   },
   "files": [
     "dist",
