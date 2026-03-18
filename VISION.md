@@ -4,6 +4,29 @@
 
 ---
 
+## Soul
+
+Cortex is the continuity protocol that makes Claude feel like one mind instead of several strangers who happen to share a name. Context, decisions, and awareness flow between surfaces so the person never has to be the sync layer.
+
+## Pillars
+
+1. **Context Schema & Types** -- REALIZED
+   Context objects with 6 types (decision, artifact, state, priority, blocker, insight), YAML frontmatter, confidence levels, TTL, and supersedes linking. TypeScript types shipped.
+
+2. **Code-Side Transport** -- REALIZED
+   PostToolUse hook captures commits, SessionEnd captures branch state. MCP server with 6 tools (query, write, status, show, delete, inject). Wired into all Claude Code sessions.
+
+3. **CLI & Store Management** -- REALIZED
+   File-based store at ~/.cortex/. CLI commands: status, list, show, delete, compact, export, inject. 48 tests (22 unit + 26 E2E), all passing.
+
+4. **Chat-Side Integration** -- UNREALIZED
+   Browser extension or Anthropic Memory API integration to capture decisions from Chat conversations and surface Code-produced context in Chat.
+
+5. **Protocol Formalization** -- UNREALIZED
+   Publish Cortex as a formal protocol spec with conformance tests that any Claude surface or third-party tool can implement.
+
+---
+
 ## The World As It Is
 
 Claude is becoming the operating system for knowledge work. Millions of people think with Claude every day — in Chat on the web, on mobile, in Claude Code at the terminal. Each surface is powerful on its own. Together, they should be extraordinary.
