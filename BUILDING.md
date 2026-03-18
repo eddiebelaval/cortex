@@ -2,6 +2,8 @@
 
 > What's been done, what's in progress, what's next.
 
+Last updated: 2026-03-15
+
 ---
 
 ## Current Phase: Phase 1 Complete
