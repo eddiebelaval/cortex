@@ -10,8 +10,7 @@
 
 import { ContextStore } from '../store/index.js';
 import { commitToContext } from './code-hook.js';
-import { git, gitLines } from '../utils/index.js';
-import { basename } from 'node:path';
+import { git, gitLines, resolveProject } from '../utils/index.js';
 
 async function main() {
   let input = '';
@@ -37,7 +36,8 @@ async function main() {
     const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
     const filesChanged = gitLines('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD');
     const projectDir = git('rev-parse', '--show-toplevel');
-    const project = basename(projectDir);
+    const project = resolveProject(projectDir);
+    if (!project) process.exit(0); // Skip directories mapped to "~"
 
     if (!hash || !message || !branch) process.exit(0);
 

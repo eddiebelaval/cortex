@@ -2,9 +2,9 @@
 
 > The continuity protocol for Claude surfaces.
 
-Build stage: Stage 7
+Build stage: Stage 8
 Drift status: CURRENT
-Last updated: 2026-03-15
+Last updated: 2026-03-20
 
 ---
 

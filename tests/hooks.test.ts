@@ -37,7 +37,7 @@ describe('Hook functions', () => {
       expect(ctx.source_surface).toBe('code');
       expect(ctx.project).toBe('cortex');
       expect(ctx.confidence).toBe('high');
-      expect(ctx.ttl).toBe('persistent');
+      expect(ctx.ttl).toBe('7d');
       expect(ctx.supersedes).toBeNull();
       expect(ctx.title).toBe('refactor: clean up store logic');
       expect(ctx.body).toContain('abc1234');

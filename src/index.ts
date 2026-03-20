@@ -1,5 +1,7 @@
 export { ContextStore } from './store/index.js';
 export { commitToContext, sessionToContext } from './hooks/index.js';
+export { startServer } from './mcp/index.js';
+export type { ServeOptions } from './mcp/index.js';
 export type {
   ContextObject,
   ContextType,

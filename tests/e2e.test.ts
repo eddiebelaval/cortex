@@ -200,7 +200,7 @@ describe('CLI binary', () => {
       encoding: 'utf-8',
       timeout: 10000,
     }).trim();
-    expect(output).toBe('0.1.0');
+    expect(output).toBe('0.2.0');
   });
 
   it('cortex --help outputs usage', () => {

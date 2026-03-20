@@ -1,6 +1,6 @@
 {
   "name": "cortex-protocol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The continuity protocol for Claude surfaces",
   "type": "module",
   "main": "dist/index.js",

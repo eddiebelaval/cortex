@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { ContextStore } from '../store/index.js';
 import { formatAge, summarizeContexts, formatStoreSummary, formatContextSummary } from '../utils/index.js';
+import { startServer } from '../mcp/http-server.js';
 import type { ContextType, Surface, Confidence, TTL } from '../types/index.js';
 
 const store = new ContextStore();
@@ -12,7 +13,7 @@ const program = new Command();
 program
   .name('cortex')
   .description('The continuity protocol for Claude surfaces')
-  .version('0.1.0');
+  .version('0.2.0');
 
 program
   .command('status')
@@ -182,6 +183,20 @@ program
     console.log(`# Cortex — Cross-Surface Context for ${project}\n`);
     console.log(`> ${contexts.length} context(s) from other surfaces. Updated ${new Date().toISOString()}.\n`);
     console.log(formatContextSummary(contexts));
+  });
+
+program
+  .command('serve')
+  .description('Start the HTTP MCP server for Claude Chat integration')
+  .option('-p, --port <port>', 'Port to listen on', '3131')
+  .option('--token <token>', 'Bearer token for authentication')
+  .action(async (opts) => {
+    const port = parseInt(opts.port, 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      console.error(`Invalid port: ${opts.port}`);
+      process.exit(1);
+    }
+    await startServer({ port, token: opts.token });
   });
 
 program.parse();
