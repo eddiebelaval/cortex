@@ -66,9 +66,39 @@ Built an HTTP MCP server that exposes the same 6 Cortex tools over the Streamabl
 
 ## Next
 
-- [ ] Phase 3 -- Protocol formalization and conformance tests
+### Phase 3 -- Protocol Formalization (v0.3.0)
+
+Protocol Formalization is the biggest gap between the vision and the shipped product. The reference implementation already enforces protocol semantics through code (Zod schemas, store logic, MCP tool schemas), but none of this is extracted into a standalone specification that someone could implement against.
+
+**What needs to happen:**
+
+1. **Write PROTOCOL.md** -- Extract the implicit protocol from the codebase into a standalone spec using RFC 2119 language (MUST/SHOULD/MAY). Covers: context object format, frontmatter validation rules, surface contracts, transport requirements, conflict resolution algorithm, TTL/compaction behavior, security requirements.
+
+2. **Add protocol version field** -- Add `protocol: cortex/1.0` to context object frontmatter. Update Zod schemas, store read/write, and MCP tools to include the version. Define backward compatibility rules.
+
+3. **Build conformance test suite** -- Tests that verify protocol compliance independent of the reference implementation. Round-trip serialization, frontmatter validation, tool contract verification, conflict resolution, TTL expiration.
+
+4. **Version negotiation** -- Define how surfaces with different protocol versions interact.
+
+**Prerequisite:** Live testing with Claude Chat via Connector (in progress) should complete first. Real-world usage data may reveal protocol gaps that should be addressed before formalizing.
+
+### Other Next Steps
+
 - [ ] npm publish (v0.2.0)
 - [ ] Anthropic outreach -- position Cortex as the continuity case study
+
+---
+
+## Heal Session: 2026-03-20
+
+**Blocker addressed:** Protocol Formalization (Pillar 5) was UNREALIZED with no documentation of what it entails or what's needed to realize it.
+
+**What changed:**
+- **SPEC.md:** Added "Protocol Formalization (Phase 3)" section documenting: what implicit protocol semantics already exist in the codebase, what Phase 3 will produce (spec document, conformance tests, version scheme), and current status. Added protocol version to Current Boundaries.
+- **BUILDING.md:** Expanded Phase 3 from a single bullet into a scoped roadmap with 4 concrete work items and a prerequisite.
+- **No code changes.** Protocol Formalization requires design work before implementation. This heal documents the gap clearly so the next session can start building.
+
+**Why documentation, not code:** The protocol spec itself needs to be designed (RFC 2119 language, what's normative vs. informational, version scheme). Writing code before the spec exists would produce conformance tests with nothing to conform to. The right first step is scoping the work, which this heal does.
 
 ---
 

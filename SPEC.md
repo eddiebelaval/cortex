@@ -216,12 +216,57 @@ Human
 | MCP server (HTTP) | StreamableHTTP transport for Claude Chat Connectors | Live |
 | Anthropic Memory API | Potential deeper integration for Chat context | Planned (Phase 3) |
 
+## Protocol Formalization (Phase 3 -- NOT YET IMPLEMENTED)
+
+Phase 3 will extract the implicit protocol semantics already present in the reference implementation into a standalone, implementable specification. The goal: any Claude surface or third-party tool can implement Cortex compatibility without reading this codebase.
+
+### What Exists Today (Implicit Protocol)
+
+The reference implementation already enforces these protocol semantics through code:
+
+- **Context object schema:** 6 types, 4 surfaces, 9 frontmatter fields, markdown body. Validated by Zod schemas in `src/types/context.ts`.
+- **Surface contracts:** defined produce/consume relationships per surface (Chat produces decisions, Code produces artifacts, etc.). Documented in SPEC but enforced only by convention.
+- **Transport contracts:** stdio MCP (6 tools with defined input/output schemas in `src/mcp/schemas.ts`) and HTTP MCP (StreamableHTTP with bearer auth). Tool schemas are the closest thing to a formal API contract.
+- **Conflict resolution rules:** newer-wins, supersedes linking, confidence weighting. Implemented in store logic but not specified as normative requirements.
+- **TTL semantics:** persistent, session, 24h, 7d. Compaction logic in `src/hooks/compact.ts`.
+
+### What Phase 3 Will Produce
+
+1. **Protocol Specification Document** -- a standalone document (likely `PROTOCOL.md` or similar) that defines:
+   - Context object format (MUST/SHOULD/MAY requirements, following RFC 2119)
+   - Required frontmatter fields and validation rules
+   - Surface contract definitions (what each surface type MUST produce/consume)
+   - Transport requirements (what a conformant transport MUST support)
+   - Conflict resolution algorithm (normative, not just descriptive)
+   - TTL and compaction behavior
+   - Security requirements (path traversal protection, auth for HTTP transport)
+
+2. **Conformance Test Suite** -- tests that any implementation can run to verify protocol compliance:
+   - Context object serialization/deserialization round-trip tests
+   - Frontmatter validation tests (required fields, valid values, ID format)
+   - Transport tool contract tests (expected inputs/outputs for each of the 6 tools)
+   - Conflict resolution tests (supersedes, timestamp ordering, confidence weighting)
+   - TTL expiration tests
+
+3. **Version Scheme** -- protocol versioning independent of implementation versioning:
+   - Protocol version in context object frontmatter (e.g., `protocol: cortex/1.0`)
+   - Backward compatibility rules
+   - Version negotiation between surfaces
+
+### Current Status
+
+- **Protocol semantics:** embedded in code, not extracted as a spec
+- **Conformance tests:** do not exist (existing tests verify the reference implementation, not protocol compliance)
+- **Protocol versioning:** not implemented
+- **Third-party implementability:** possible by reading source, but no spec to build against
+
 ## Current Boundaries
 
 - Does NOT sync to cloud (local-first only)
 - Does NOT store conversation transcripts (structured context objects only)
 - Does NOT have conformance tests for third-party implementations (Phase 3)
 - Does NOT have a published protocol spec (Phase 3)
+- Does NOT have a protocol version field in context objects (Phase 3)
 - Does NOT have a browser extension (HTTP MCP serves this role instead)
 
 ## Verification Surface
@@ -261,6 +306,7 @@ Human
 | 2026-03-15 | All | Initial spec written alongside implementation | Phase 1 reference implementation built in a single session | Pillars 1-3 marked REALIZED in VISION |
 | 2026-03-20 | Capabilities 8, Integrations, Data Flow, Verification | HTTP MCP server added for Chat-side integration | Phase 2 shipped: StreamableHTTP transport, bearer auth, CORS, file watcher | Pillar 4 marked REALIZED in VISION |
 | 2026-03-20 | All | Upgraded to v2 format | Triad v2 template adoption | Added frontmatter, System Role, Primary Actors, Data Flow, Core Entities, Current Boundaries, Verification Surface |
+| 2026-03-20 | Protocol Formalization, Current Boundaries | Documented Phase 3 scope and current state | Heal session: Protocol Formalization was UNREALIZED with no spec-level documentation of what it entails | Pillar 5 remains UNREALIZED; gap now clearly scoped |
 
 ---
 
