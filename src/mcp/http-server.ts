@@ -28,15 +28,17 @@ import { formatAge, summarizeContexts, formatStoreSummary, formatContextSummary 
 import { querySchema, writeSchema, idSchema, injectSchema } from './schemas.js';
 import type { Surface } from '../types/index.js';
 
-const PORT = parseInt(process.env.CORTEX_PORT ?? '3131', 10);
-const AUTH_TOKEN = process.env.CORTEX_TOKEN ?? '';
+export interface ServeOptions {
+  port?: number;
+  token?: string;
+}
 
 const store = new ContextStore();
 let storeDirty = false;
 
 function createMcpServer(): Server {
   const server = new Server(
-    { name: 'cortex', version: '0.1.0' },
+    { name: 'cortex', version: '0.2.0' },
     { capabilities: { tools: {} } },
   );
 
@@ -213,7 +215,10 @@ function createMcpServer(): Server {
   return server;
 }
 
-async function main() {
+export async function startServer(opts: ServeOptions = {}): Promise<void> {
+  const port = opts.port ?? parseInt(process.env.CORTEX_PORT ?? '3131', 10);
+  const authToken = opts.token ?? process.env.CORTEX_TOKEN ?? '';
+
   await store.init();
 
   // Watch for external writes
@@ -242,9 +247,9 @@ async function main() {
     }
 
     // Auth check
-    if (AUTH_TOKEN) {
+    if (authToken) {
       const auth = req.headers.authorization;
-      if (auth !== `Bearer ${AUTH_TOKEN}`) {
+      if (auth !== `Bearer ${authToken}`) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
@@ -304,10 +309,10 @@ async function main() {
     res.end(JSON.stringify({ error: 'Not found. Use /mcp for MCP protocol or /health for status.' }));
   });
 
-  httpServer.listen(PORT, () => {
-    console.log(`[cortex] Remote MCP server running on http://localhost:${PORT}/mcp`);
-    console.log(`[cortex] Health check: http://localhost:${PORT}/health`);
-    if (AUTH_TOKEN) {
+  httpServer.listen(port, () => {
+    console.log(`[cortex] Remote MCP server running on http://localhost:${port}/mcp`);
+    console.log(`[cortex] Health check: http://localhost:${port}/health`);
+    if (authToken) {
       console.log(`[cortex] Auth: Bearer token required`);
     } else {
       console.log(`[cortex] Auth: NONE (set CORTEX_TOKEN for bearer auth)`);
@@ -317,7 +322,11 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error('[cortex] Fatal:', err);
-  process.exit(1);
-});
+// Auto-run when executed directly (cortex-serve binary)
+const isDirectRun = process.argv[1]?.endsWith('http-server.js');
+if (isDirectRun) {
+  startServer().catch((err) => {
+    console.error('[cortex] Fatal:', err);
+    process.exit(1);
+  });
+}

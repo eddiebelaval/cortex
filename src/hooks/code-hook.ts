@@ -29,7 +29,7 @@ export function commitToContext(commit: CommitInfo, store: ContextStore): Contex
     timestamp: new Date().toISOString(),
     project: commit.project,
     confidence: 'high',
-    ttl: 'persistent',
+    ttl: '7d',
     supersedes: null,
     tags,
     title: commit.message.split('\n')[0],

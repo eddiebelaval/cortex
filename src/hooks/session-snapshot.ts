@@ -8,8 +8,7 @@
 
 import { ContextStore } from '../store/index.js';
 import { sessionToContext } from './code-hook.js';
-import { git, gitLines } from '../utils/index.js';
-import { basename } from 'node:path';
+import { git, gitLines, resolveProject } from '../utils/index.js';
 
 async function main() {
   const projectArg = process.argv[2];
@@ -19,7 +18,8 @@ async function main() {
     process.exit(0);
   }
 
-  const project = projectArg ?? basename(projectDir);
+  const project = projectArg ?? resolveProject(projectDir);
+  if (!project) process.exit(0); // Skip directories mapped to "~"
   const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
   if (!branch) process.exit(0);
 
